@@ -724,14 +724,26 @@ class CVariable(CExpression):
                                     yield "->", None
                                     yield from c_field.c_repr_chunks()
                                     return
+                                else:
+                                    # accessing beyond known offset - indicates a bug in type inference
+                                    l.warning("Accessing non-existent offset %d in struct %s. This indicates a bug in "
+                                              "the type inference engine.", self.offset, self.variable.type.pts_to)
 
                         elif isinstance(self.variable.type.pts_to, SimTypeArray):
-                            # it's pointing to an array!
-                            yield from self.variable.c_repr_chunks()
-                            yield "[", None
-                            yield str(self.offset), self.offset
-                            yield "]", None
-                            return
+                            if isinstance(self.offset, int):
+                                # it's pointing to an array! take the corresponding element
+                                yield from self.variable.c_repr_chunks()
+                                yield "[", None
+                                yield str(self.offset), self.offset
+                                yield "]", None
+                                return
+
+                        # other cases
+                        yield from self.variable.c_repr_chunks()
+                        yield "[", None
+                        yield from CExpression._try_c_repr_chunks(self.offset)
+                        yield "]", None
+                        return
 
                 # default output
                 yield "*(", None
@@ -1352,9 +1364,16 @@ class StructuredCodeGenerator(Analysis):
                 elif isinstance(cvariable.rhs, CConstant) and isinstance(cvariable.lhs, CVariable):
                     offset = cvariable.rhs.value
                     base = cvariable.lhs
+                elif isinstance(cvariable.lhs, CVariable) and isinstance(cvariable.rhs, CTypeCast):
+                    offset = cvariable.rhs
+                    base = cvariable.lhs
+                elif isinstance(cvariable.rhs, CVariable) and isinstance(cvariable.lhs, CTypeCast):
+                    offset = cvariable.lhs
+                    base = cvariable.rhs
                 else:
-                    base = None
-                    offset = None
+                    # GUESS: we need some guessing here
+                    base = cvariable.lhs
+                    offset = cvariable.rhs
 
             if base is not None and offset is not None:
                 cvariable = self._cvariable(base, offset=offset, variable_type=base.variable_type)

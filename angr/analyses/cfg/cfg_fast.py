@@ -1055,7 +1055,7 @@ class CFGFast(ForwardAnalysis, CFGBase):    # pylint: disable=abstract-method
         """
 
         if self._low_priority:
-            self._release_gil(len(self._nodes), 20, 0.0001)
+            self._release_gil(len(self._nodes), 20, 0.000001)
 
         # a new entry is picked. Deregister it
         self._deregister_analysis_job(job.func_addr, job)
@@ -3692,7 +3692,6 @@ class CFGFast(ForwardAnalysis, CFGBase):    # pylint: disable=abstract-method
                     break
             elif isinstance(stmt, pyvex.IRStmt.Put) and stmt.offset == self.project.arch.registers['gp'][0]:
                 last_gp_setting_insn_id = insn_ctr
-                break
 
         if last_gp_setting_insn_id is None:
             return None

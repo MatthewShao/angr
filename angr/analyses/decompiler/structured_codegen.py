@@ -10,6 +10,7 @@ from ...sim_type import (SimTypeLongLong, SimTypeInt, SimTypeShort, SimTypeChar,
     SimTypeBottom, SimTypeArray, SimTypeFunction)
 from ...sim_variable import SimVariable, SimTemporaryVariable, SimStackVariable, SimRegisterVariable, SimMemoryVariable
 from ...utils.constants import is_alignment_mask
+from ...utils.library import get_cpp_function_name
 from ...errors import UnsupportedNodeTypeError
 from .. import Analysis, register_analysis
 from .region_identifier import MultiNode
@@ -178,7 +179,11 @@ class CFunction(CConstruct):  # pylint:disable=abstract-method
         yield self.functy.returnty.c_repr(), None
         yield " ", None
         # function name
-        yield self.demangled_name or self.name, None
+        if self.demangled_name:
+            normalized_name = get_cpp_function_name(self.demangled_name, specialized=False, qualified=False)
+        else:
+            normalized_name = self.name
+        yield normalized_name, None
         # argument list
         yield "(", None
         for i, (arg_type, arg) in enumerate(zip(self.functy.args, self.arg_list)):
@@ -517,7 +522,10 @@ class CFunctionCall(CStatement):
             yield " = ", None
 
         if self.callee_func is not None:
-            func_name = self.callee_func.demangled_name or self.callee_func.name
+            if self.callee_func.demangled_name:
+                func_name = get_cpp_function_name(self.callee_func.demangled_name, specialized=False, qualified=True)
+            else:
+                func_name = self.callee_func.name
             yield func_name, self
         else:
             yield from CExpression._try_c_repr_chunks(self.callee_target)
@@ -1358,22 +1366,27 @@ class StructuredCodeGenerator(Analysis):
             # special handling
             base, offset = None, None
             if isinstance(cvariable, CBinaryOp) and cvariable.op == 'Add':
+                # variable and a const
                 if isinstance(cvariable.lhs, CConstant) and isinstance(cvariable.rhs, CVariable):
                     offset = cvariable.lhs.value
                     base = cvariable.rhs
                 elif isinstance(cvariable.rhs, CConstant) and isinstance(cvariable.lhs, CVariable):
                     offset = cvariable.rhs.value
                     base = cvariable.lhs
+                # variable and a typecast
                 elif isinstance(cvariable.lhs, CVariable) and isinstance(cvariable.rhs, CTypeCast):
                     offset = cvariable.rhs
                     base = cvariable.lhs
                 elif isinstance(cvariable.rhs, CVariable) and isinstance(cvariable.lhs, CTypeCast):
                     offset = cvariable.lhs
                     base = cvariable.rhs
-                else:
+                elif isinstance(cvariable.lhs, CVariable) and isinstance(cvariable.rhs, CVariable):
                     # GUESS: we need some guessing here
                     base = cvariable.lhs
                     offset = cvariable.rhs
+                else:
+                    base = None
+                    offset = None
 
             if base is not None and offset is not None:
                 cvariable = self._cvariable(base, offset=offset, variable_type=base.variable_type)

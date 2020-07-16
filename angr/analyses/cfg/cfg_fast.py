@@ -2532,7 +2532,7 @@ class CFGFast(ForwardAnalysis, CFGBase):    # pylint: disable=abstract-method
         jump.resolved_targets = targets
         all_targets = set(targets)
         for addr in all_targets:
-            to_outside = addr in self.functions or not self._addrs_belong_to_same_section(jump.addr, addr)
+            to_outside = jump.jumpkind == 'Ijk_Call' or addr in self.functions or not self._addrs_belong_to_same_section(jump.addr, addr)
 
             # TODO: get a better estimate of the function address
             target_func_addr = jump.func_addr if not to_outside else addr
@@ -2542,8 +2542,8 @@ class CFGFast(ForwardAnalysis, CFGBase):    # pylint: disable=abstract-method
             job = CFGJob(addr, target_func_addr, jump.jumpkind,
                          last_addr=source_addr,
                          src_node=self._nodes[source_addr],
-                         src_ins_addr=None,
-                         src_stmt_idx=None,
+                         src_ins_addr=jump.ins_addr,
+                         src_stmt_idx=jump.stmt_idx,
                          func_edges=[func_edge],
                          )
             self._insert_job(job)
@@ -3697,11 +3697,11 @@ class CFGFast(ForwardAnalysis, CFGBase):    # pylint: disable=abstract-method
             return None
 
         # Prudently search for $gp values
-        state = self.project.factory.blank_state(addr=addr, mode="fastpath",
+        state = self.project.factory.blank_state(addr=addr, mode="fastpath", remove_options=o.refs,
                                                  add_options={o.NO_CROSS_INSN_OPT},
                                                  )
-        state.regs.t9 = func_addr
-        state.regs.gp = 0xffffffff
+        state.regs._t9 = func_addr
+        state.regs._gp = 0xffffffff
         try:
             succ = self.project.factory.successors(state, num_inst=last_gp_setting_insn_id + 1)
         except SimIRSBNoDecodeError:

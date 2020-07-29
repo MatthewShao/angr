@@ -31,10 +31,6 @@ class Clinic(Analysis):
                  sp_tracker_track_memory=True,
                  optimization_passes=None,
                  ):
-
-        # Delayed import
-        import ailment.analyses  # pylint:disable=redefined-outer-name,unused-import,import-outside-toplevel
-
         if not func.normalized:
             raise ValueError("Decompilation must work on normalized function graphs.")
 
@@ -388,8 +384,9 @@ class Clinic(Analysis):
         vr = self.project.analyses.VariableRecoveryFast(self.function,  # pylint:disable=unused-variable
                                                         func_graph=ail_graph, kb=tmp_kb, track_sp=False,
                                                         func_args=arg_list)
-        # clean up existing types
+        # clean up existing types for this function
         tmp_kb.variables[self.function.addr].remove_types()
+        # TODO: Type inference for global variables
         # run type inference
         try:
             tp = self.project.analyses.Typehoon(vr.type_constraints, kb=tmp_kb, var_mapping=vr.var_to_typevar)

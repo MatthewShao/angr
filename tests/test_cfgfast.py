@@ -857,6 +857,29 @@ def test_generate_special_info():
     nose.tools.assert_equal(cfg.functions['main'].info['gp'], 0x418ca0)
 
 
+def test_plt_stub_has_one_jumpout_site():
+
+    # each PLT stub must have exactly one jumpout site
+    path = os.path.join(test_location, "x86_64", "1after909")
+    proj = angr.Project(path, auto_load_libs=False)
+    cfg = proj.analyses.CFGFast()
+
+    for func in cfg.kb.functions.values():
+        if func.is_plt:
+            assert len(func.jumpout_sites) == 1
+
+
+def test_generate_special_info():
+
+    path = os.path.join(test_location, "mipsel", "fauxware")
+    proj = angr.Project(path, auto_load_libs=False)
+
+    cfg = proj.analyses.CFGFast()
+
+    nose.tools.assert_true(any(func.info for func in cfg.functions.values()))
+    nose.tools.assert_equal(cfg.functions['main'].info['gp'], 0x418ca0)
+
+
 def run_all():
 
     g = globals()
@@ -897,6 +920,8 @@ def run_all():
     test_function_leading_blocks_merging()
     test_cfg_with_patches()
     test_indirect_jump_to_outside()
+    test_generate_special_info()
+    test_plt_stub_has_one_jumpout_site()
     test_generate_special_info()
 
 
